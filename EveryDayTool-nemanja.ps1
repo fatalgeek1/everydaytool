@@ -8,7 +8,7 @@ In the essence, it is just a bundle of functions that will be executed based on 
 
 
 #>
-
+Clear-host
 Write-Host -ForegroundColor Green "WELCOME to EveryDay Tool, ease of administration is in front of you!"
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
 Start-Sleep 4
@@ -18,18 +18,39 @@ ACTIVE DIRECTORY ADMINISTRATION
 
 1. Invoke replication against all of the domain controllers in the forest.
 2. Invoke DNS replication.
+3. Check group membership.
 "
 #############
 
 Try {
-    [int]$Number = (Read-Host -Prompt "Chose the task by entering the task number" -ErrorAction SilentlyContinue)
+    [int]$Number = (Read-Host -Prompt "Chose the task by entering the task number" -ErrorAction Stop)
 }
 Catch {
     Write-Host "Input accepts only integers, please relaunch the script." -ForegroundColor Red
+    Break
 }
+Function Find-Module {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$True,Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ModuleName
+    )
+    Process {
+        Try {
+            import-module -Name $ModuleName -ErrorAction Stop
+        }
+        Catch {
+            $localname = (hostname)
+            Write-Host "Required module - $($ModuleName) is not installed on $($localname)" -ForegroundColor Red
+            Break
+        }
+    }
+}
+
 Switch ($Number) {
     1 {
-        Import-Module ActiveDirectory
+        Find-Module "ActiveDirectory"
         # Check last replication time first
         $DomainControllers = (Get-ADDomainController -filter *).name
         $LastRepTime = (Get-ADReplicationUpToDatenessVectorTable -Target $DomainControllers[0]).LastReplicationSuccess[0]
@@ -42,7 +63,7 @@ Switch ($Number) {
         }
     }
     2 {
-        Import-Module ActiveDirectory
+        Find-Module ActiveDirectory
         $DClist = new-object System.Collections.Arraylist
         $SiteList = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().sites.name
         foreach ($Site in $SiteList) {
@@ -61,10 +82,27 @@ Switch ($Number) {
         }
     }
     3 {
-
-
+        Find-Module ActiveDirectory
+        $GroupName = (read-host -Prompt "Enter the group name")
+        $Stringtest = [string]::IsNullOrEmpty("$GroupName")
+        if ($true -eq $Stringtest) {
+            Write-Host "You did not enter any input." -ForegroundColor Red
+            Break
+        }
+        try {
+            Get-ADGroup -Identity "$GroupName" -ErrorAction Stop | out-null
+        }
+        catch {
+            Write-Host "Cannot find an object with identity $($GroupName) under $env:USERDNSDOMAIN" -ForegroundColor Red
+            Break
+        }
+        [array]$Members = (Get-ADGroupMember -Identity "$($GroupName)").Name
+        Write-Host "Members of the group - $GroupName are:" -ForegroundColor Cyan
+        foreach ($Member in $Members) {
+            Write-Host "$Member" -ForegroundColor Green
+        }
     }
     Default {
-        Write-Host "Number that you entered is out of scope." -ForegroundColor Red
+        Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
     }
 }
