@@ -17,6 +17,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 -------------------------------
 
 1. Invoke replication against all of the domain controllers in the forest.
+2. Invoke DNS replication.
 "
 #############
 
@@ -37,11 +38,27 @@ Switch ($Number) {
         foreach ($DC in $DomainControllers) {
             Invoke-Command -ComputerName $DC -ScriptBlock {
                 cmd.exe /c repadmin /syncall /A /e /d
-            } -InDisconnectedSession
+            } -InDisconnectedSession | Out-Null
         }
     }
     2 {
-        
+        Import-Module ActiveDirectory
+        $DClist = new-object System.Collections.Arraylist
+        $SiteList = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().sites.name
+        foreach ($Site in $SiteList) {
+            [array]$DC = (Get-ADDomainController -Filter {Site -eq "$Site"}).name | Select-Object -First 1
+            $DClist += $DC
+        }
+        $ZoneList = (Get-DnsServerZone -ComputerName $DClist[0] | ? {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
+        Write-Host "Invoking replication against $DClist for zones $ZoneList" -ForegroundColor Cyan
+        foreach ($DC in $DClist) {
+            foreach ($Zone in $ZoneList) {
+                Invoke-Command -ComputerName $DC -ScriptBlock {
+                    dnscmd /ZoneRefresh $Zone
+                    Sync-DnsServerZone -Name $Zone 
+                } -InDisconnectedSession | Out-Null
+            }
+        }
     }
     3 {
 
