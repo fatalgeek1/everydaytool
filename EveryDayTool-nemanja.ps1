@@ -49,7 +49,7 @@ Switch ($Number) {
             [array]$DC = (Get-ADDomainController -Filter {Site -eq "$Site"}).name | Select-Object -First 1
             $DClist += $DC
         }
-        $ZoneList = (Get-DnsServerZone -ComputerName $DClist[0] | ? {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
+        $ZoneList = (Get-DnsServerZone -ComputerName $DClist[0] | Where-Object {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
         Write-Host "Invoking replication against $DClist for zones $ZoneList" -ForegroundColor Cyan
         foreach ($DC in $DClist) {
             foreach ($Zone in $ZoneList) {
@@ -61,6 +61,7 @@ Switch ($Number) {
         }
     }
     3 {
+
 
     }
     Default {
