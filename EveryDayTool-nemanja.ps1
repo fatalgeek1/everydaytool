@@ -3,7 +3,7 @@
 .SYNOPSIS
 
 .DESCRIPTION
-EveryDay Powershell automation tool represents open source collaboration project with the goal to speed up the day-to-day administration tasks in Microsoft environments.
+EveryDay Powershell automation tool represents an open source collaboration project with the goal to speed up the day-to-day administration tasks in Microsoft environments.
 In the essence, it is just a bundle of functions that will be executed based on user input choice.
 
 
@@ -19,6 +19,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 1. Invoke replication against all of the domain controllers in the forest.
 2. Invoke DNS replication.
 3. Check group membership.
+4. Find inactive computers.
 "
 #############
 
@@ -103,7 +104,22 @@ Switch ($Number) {
         }
     }
     4 {
-        
+        Find-Module ActiveDirectory
+        Write-Host "Script is going to check for all of the computer objects that did not update their password for +90 days." -ForegroundColor Cyan
+        $PwdAge = 90
+        $PwdDate = (get-date).AddDays(-$PwdAge).ToFileTime()
+        $ComputerList = (Get-ADComputer -filter {Enabled -eq $true} -Properties * | Where-Object {$_.PwdLastSet -le $PwdDate}).Name
+        $Isitempty = [string]::IsNullOrEmpty("$ComputerList")
+        if ($true -eq $Isitempty) {
+            Write-Host "There are no inactive computers in your Active Directory!" -ForegroundColor Green
+        }
+        else {
+            Write-Host "List of the computers that did not update their password for +90 days is:" -ForegroundColor Green
+            foreach ($Computer in $ComputerList) {
+                Write-Host "$Computer" -ForegroundColor Green
+            }
+        }
+
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
