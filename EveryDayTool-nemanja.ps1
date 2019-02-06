@@ -102,6 +102,9 @@ Switch ($Number) {
             Write-Host "$Member" -ForegroundColor Green
         }
     }
+    4 {
+        
+    }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
     }
