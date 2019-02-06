@@ -11,7 +11,7 @@ In the essence, it is just a bundle of functions that will be executed based on 
 
 Write-Host -ForegroundColor Green "WELCOME to EveryDay Tool, ease of administration is in front of you!"
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
-Start-Sleep 2
+Start-Sleep 4
 Write-Host -ForegroundColor Cyan "
 ACTIVE DIRECTORY ADMINISTRATION
 -------------------------------
@@ -31,7 +31,7 @@ Switch ($Number) {
         Import-Module ActiveDirectory
         # Check last replication time first
         $DomainControllers = (Get-ADDomainController -filter *).name
-        $LastRepTime = (Get-ADReplicationUpToDatenessVectorTable -Target $DomainControllers[0]).LastReplicationSuccess
+        $LastRepTime = (Get-ADReplicationUpToDatenessVectorTable -Target $DomainControllers[0]).LastReplicationSuccess[0]
         Write-Host "Last replication time was at - $LastRepTime" -ForegroundColor Cyan
         Write-Host "Invoking replication against $DomainControllers" -ForegroundColor Green
         foreach ($DC in $DomainControllers) {
