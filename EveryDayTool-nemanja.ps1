@@ -21,6 +21,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 3. Check group membership.
 4. Find inactive computers.
 5. List sites and site subnets.
+6. Clone user group membership from one to another user.
 "
 #############
 
@@ -45,6 +46,34 @@ Function Find-Module {
         Catch {
             $localname = (hostname)
             Write-Host "Required module - $($ModuleName) is not installed on $($localname)" -ForegroundColor Red
+            Break
+        }
+    }
+}
+Function Get-UserInput {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true,Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [string]$WriteOut
+    )
+    process {
+        Write-Host "$WriteOut  " -ForegroundColor Magenta -NoNewline
+        Read-Host
+
+    }
+}
+Function Find-EmptyString {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true,Position=0)]
+        [AllowEmptyString()]
+        [string]$VariableName
+    )
+    process {
+        $Stringtest = [string]::IsNullOrEmpty($VariableName)
+        if ($true -eq $Stringtest) {
+            Write-Host "You did not insert any input." -ForegroundColor Red
             Break
         }
     }
@@ -85,12 +114,8 @@ Switch ($Number) {
     }
     3 {
         Find-Module ActiveDirectory
-        $GroupName = (read-host -Prompt "Enter the group name")
-        $Stringtest = [string]::IsNullOrEmpty("$GroupName")
-        if ($true -eq $Stringtest) {
-            Write-Host "You did not enter any input." -ForegroundColor Red
-            Break
-        }
+        $GroupName = (Get-UserInput -WriteOut "Enter the group name:")
+        Find-EmptyString -VariableName $GroupName
         try {
             Get-ADGroup -Identity "$GroupName" -ErrorAction Stop | out-null
         }
@@ -99,6 +124,7 @@ Switch ($Number) {
             Break
         }
         [array]$Members = (Get-ADGroupMember -Identity "$($GroupName)").Name
+        Write-Output ""
         Write-Host "Members of the group - $GroupName are:" -ForegroundColor Cyan
         foreach ($Member in $Members) {
             Write-Host "$Member" -ForegroundColor Green
@@ -142,6 +168,45 @@ Switch ($Number) {
             $sitesandsubnets += $temp
         }
         $sitesandsubnets
+    }
+    6 {
+        Find-Module ActiveDirectory
+        $SourceUser = (Get-UserInput -WriteOut "Insert the name of the source user:")
+        Find-EmptyString -VariableName $SourceUser
+        try {
+            $Getuser = Get-ADUser -Identity $SourceUser -ErrorAction Stop
+        }
+        catch {
+            Write-Host "Cannot find and object with identity $($SourceUser) under $env:USERDNSDOMAIN" -ForegroundColor Red
+            Break
+        }
+        $DestinationUser = (Get-UserInput -WriteOut "Insert the name of the destination user:")
+        Find-EmptyString -VariableName $DestinationUser
+        try {
+            $Getuser = Get-ADUser -Identity $DestinationUser -ErrorAction Stop
+        }
+        catch {
+            Write-Host "Cannot find and object with identity $($SourceUser) under $env:USERDNSDOMAIN" -ForegroundColor Red
+            Break
+        }
+        Write-Output ""
+        Write-Host "Successfully found both user objects under $env:USERDNSDOMAIN" -ForegroundColor Green
+        $GroupMembership = (Get-ADPrincipalGroupMembership -Identity $SourceUser).Name
+        Write-Host "Cloning group membership from $($SourceUser) to $($DestinationUser)" -ForegroundColor Cyan
+        Write-Host "Group list:" -ForegroundColor Green
+        foreach ($Group in $GroupMembership) {
+            Write-Host $Group -ForegroundColor Green
+        }
+        Write-Output ""
+        foreach ($Group in $GroupMembership) {
+            try {
+                Write-Host "Adding $($DestinationUser) to group $($Group)" -ForegroundColor Cyan
+                Add-ADGroupMember -Identity "$Group" -Members "$DestinationUser" -ErrorAction 
+            }
+            catch {
+                Write-Host "User was already a member of $($Group) group." -ForegroundColor Yellow
+            }
+        }
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
