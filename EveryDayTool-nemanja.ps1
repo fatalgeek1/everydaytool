@@ -1,29 +1,25 @@
 <#
 
-.SYNOPSIS
-
 .DESCRIPTION
-EveryDay Powershell automation tool represents an open source collaboration project with the goal to speed up the day-to-day administration tasks in Microsoft environments.
+Powershell4All automation tool represents an open source collaboration project with the goal to speed up the day-to-day administration tasks in Microsoft environments.
 In the essence, it is just a bundle of functions that will be executed based on user input choice.
-
 
 #>
 Clear-host
-Write-Host -ForegroundColor Green "WELCOME to EveryDay Tool, ease of administration is in front of you!"
+Write-Host -ForegroundColor Green "WELCOME Powershell4all, ease of administration is in front of you!"
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
 Write-Host -ForegroundColor Cyan "
-ACTIVE DIRECTORY ADMINISTRATION
--------------------------------
 
 1. Invoke replication against all of the domain controllers in the forest.
 2. Invoke DNS replication.
-3. Check group membership.
-4. Find inactive computers.
-5. List sites and site subnets.
-6. Clone user group membership from one to another user.
-7. Get computer site.
-8. Test secure LDAP.
-9 Get local administrators.
+3. Clear DNS cache.
+4. Check group membership.
+5. Find inactive computers.
+6. List sites and site subnets.
+7. Clone user group membership from one to another user.
+8. Get computer site.
+9. Test secure LDAP.
+10. Get local administrators.
 "
 #############
 
@@ -116,6 +112,41 @@ Switch ($Number) {
     }
     3 {
         Find-Module ActiveDirectory
+        Find-Module DNSServer
+        $DNSServers = (Get-UserInput -WriteOut "Type the name of DNS server, or type all to affect them all:")
+        Find-EmptyString -VariableName $DNSServers
+        if ($DNSServers -eq "All") {
+            $DNSServers = New-Object System.Collections.ArrayList
+            $FinalDNS = New-Object System.Collections.ArrayList
+            $DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().namingroleowner.DomainControllerName)
+            $Zonelist = (Get-DnsServerZone -ComputerName $DC | ? {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
+            foreach ($Zone in $Zonelist) {
+                $DNSTemp = ((Get-DnsServerResourceRecord -ComputerName $DC -ZoneName $Zone -RRType Ns).RecordData.NameServer | Select-Object -Unique)
+                $DNSServers += $DNSTemp
+            }
+            foreach ($Server in $DNSServers) {
+                $Name = $Server.split(".")[0]
+                $FinalDNS += $Name
+                }
+            $FinalDNS = ($FinalDNS | Select-Object -Unique)
+            foreach ($Server in $FinalDNS) {
+                Try {
+                    Write-Host "Clearing DNS cache - $Server." -ForegroundColor Cyan
+                    Invoke-Command -ComputerName $Server -ScriptBlock {
+                        dnscmd /clearcache ; ipconfig /flushdns
+                    } -ErrorAction Stop | Out-Null
+                }
+                Catch {
+                    Write-Host "Cannot reach server - $Server." -ForegroundColor Red
+                }
+            }
+        }
+        else {
+
+        }
+    }
+    4 {
+        Find-Module ActiveDirectory
         $GroupName = (Get-UserInput -WriteOut "Enter the group name:")
         Find-EmptyString -VariableName $GroupName
         try {
@@ -132,7 +163,7 @@ Switch ($Number) {
             Write-Host "$Member" -ForegroundColor Green
         }
     }
-    4 {
+    5 {
         Find-Module ActiveDirectory
         Write-Host "Script is going to check for all of the computer objects that did not update their password for +90 days." -ForegroundColor Cyan
         $PwdAge = 90
@@ -150,7 +181,7 @@ Switch ($Number) {
         }
 
     }
-    5 {
+    6 {
         Find-Module ActiveDirectory
         $sites = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().sites
         $sitesandsubnets = New-Object System.Collections.ArrayList
@@ -171,7 +202,7 @@ Switch ($Number) {
         }
         $sitesandsubnets
     }
-    6 {
+    7 {
         Find-Module ActiveDirectory
         $SourceUser = (Get-UserInput -WriteOut "Insert the name of the source user:")
         Find-EmptyString -VariableName $SourceUser
@@ -210,7 +241,7 @@ Switch ($Number) {
             }
         }
     }
-    7 {
+    8 {
         $RemoteComputer = (Get-UserInput -WriteOut "Enter the name of the computer:")
         Find-EmptyString -VariableName $RemoteComputer
         Try {
@@ -229,7 +260,7 @@ Switch ($Number) {
         }
         $FoundSite
     }
-    8 {
+    9 {
         $DomainController = (Get-UserInput -WriteOut "Type the name of the Domain Controller, or type all to test them all:")
         Find-EmptyString -VariableName $DomainController
         if ($DomainController -eq "All") {
@@ -265,7 +296,7 @@ Switch ($Number) {
             }
         }
     }
-    9 {
+    10 {
         $ComputerName = (Get-UserInput -WriteOut "Type the name of the computer:")
         Find-EmptyString -VariableName $ComputerName
         Try {
