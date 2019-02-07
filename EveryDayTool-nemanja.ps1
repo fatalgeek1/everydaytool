@@ -20,6 +20,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 2. Invoke DNS replication.
 3. Check group membership.
 4. Find inactive computers.
+5. List sites and site subnets.
 "
 #############
 
@@ -120,6 +121,27 @@ Switch ($Number) {
             }
         }
 
+    }
+    5 {
+        Find-Module ActiveDirectory
+        $sites = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().sites
+        $sitesandsubnets = New-Object System.Collections.ArrayList
+        Write-Host "List of found AD sites is:" -ForegroundColor Cyan
+        Write-Output ""
+        foreach ($site in $sites) {
+            Write-Host "$($site.name)" -ForegroundColor Green
+        }
+        start-sleep 2
+        Write-Output ""
+        Write-Host "List of found subnets per site:" -ForegroundColor Cyan
+        foreach ($site in $sites) {
+            $temp = New-Object PSCustomObject -Property @{
+                'Site' = $($site.name)
+                'Subnet' = $($site.subnets);
+            }
+            $sitesandsubnets += $temp
+        }
+        $sitesandsubnets
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
