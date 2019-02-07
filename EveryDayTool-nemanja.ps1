@@ -283,7 +283,12 @@ Switch ($Number) {
             $tempobject = New-Object PSCustomObject -Property @{
                 'Name' = $($Admin.Name).Split("\")[1];
                 'Source' = $($Admin.Name).split("\")[0];
-                'Class' = $($Admin.ObjectClass)
+                'Class' = $(if ($Admin.Name -match '\$$') {
+                    'Computer'
+                }
+                else {
+                    $($Admin.ObjectClass)
+                });
             }
             $AdminList += $tempobject
         }
