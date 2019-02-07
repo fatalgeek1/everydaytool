@@ -23,6 +23,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 6. Clone user group membership from one to another user.
 7. Get computer site.
 8. Test secure LDAP.
+9 Get local administrators.
 "
 #############
 
@@ -263,6 +264,31 @@ Switch ($Number) {
                 Write-Host "Cannot establish LDAPS to $DomainController." -ForegroundColor Red
             }
         }
+    }
+    9 {
+        $ComputerName = (Get-UserInput -WriteOut "Type the name of the computer:")
+        Find-EmptyString -VariableName $ComputerName
+        Try {
+            Write-Host "Trying to get local Administrators from computer - $ComputerName." -ForegroundColor Cyan
+            $RetrieveAdmins = Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+                Get-LocalGroupMember -Name "Administrators"
+            } -ErrorAction Stop
+        }
+        Catch {
+            Write-Host "Cannot connect to computer - $ComputerName or local group does not exist." -ForegroundColor Red
+            Break
+        }
+        $AdminList = New-Object System.Collections.ArrayList
+        foreach ($Admin in $RetrieveAdmins) {
+            $tempobject = New-Object PSCustomObject -Property @{
+                'Name' = $($Admin.Name).Split("\")[1];
+                'Source' = $($Admin.Name).split("\")[0];
+                'Class' = $($Admin.ObjectClass)
+            }
+            $AdminList += $tempobject
+        }
+        Write-Host "Found list of local Administrators is:" -ForegroundColor Green
+        $AdminList
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
