@@ -22,6 +22,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 4. Find inactive computers.
 5. List sites and site subnets.
 6. Clone user group membership from one to another user.
+7. Get computer site.
 "
 #############
 
@@ -207,6 +208,25 @@ Switch ($Number) {
                 Write-Host "User was already a member of $($Group) group." -ForegroundColor Yellow
             }
         }
+    }
+    7 {
+        $RemoteComputer = (Get-UserInput -WriteOut "Enter the name of the computer:")
+        Find-EmptyString -VariableName $RemoteComputer
+        Try {
+            Write-Host "Trying to get AD site of $($RemoteComputer)" -ForegroundColor Cyan
+            $SiteName = invoke-command -ComputerName $RemoteComputer -ScriptBlock {
+                (Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Group Policy\State\Machine" -Name "Site-Name").'site-name'
+            } -ErrorAction Stop
+        }
+        Catch {
+            Write-Host "Cannot connect to computer - $($RemoteComputer)." -ForegroundColor Red
+            Break
+        }
+        $FoundSite = New-Object PSCustomObject -Property @{
+            'ComputerName' = $RemoteComputer;
+            'SiteName' = $SiteName;
+        }
+        $FoundSite
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
