@@ -11,7 +11,6 @@ In the essence, it is just a bundle of functions that will be executed based on 
 Clear-host
 Write-Host -ForegroundColor Green "WELCOME to EveryDay Tool, ease of administration is in front of you!"
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
-Start-Sleep 4
 Write-Host -ForegroundColor Cyan "
 ACTIVE DIRECTORY ADMINISTRATION
 -------------------------------
@@ -23,6 +22,7 @@ ACTIVE DIRECTORY ADMINISTRATION
 5. List sites and site subnets.
 6. Clone user group membership from one to another user.
 7. Get computer site.
+8. Test secure LDAP.
 "
 #############
 
@@ -227,6 +227,42 @@ Switch ($Number) {
             'SiteName' = $SiteName;
         }
         $FoundSite
+    }
+    8 {
+        $DomainController = (Get-UserInput -WriteOut "Type the name of the Domain Controller, or type all to test them all:")
+        Find-EmptyString -VariableName $DomainController
+        if ($DomainController -eq "All") {
+            Write-Host "Search for all Domain Controllers in $env:USERDNSDOMAIN" -ForegroundColor Cyan
+            $DomainControllers = (Get-ADDomainController -Filter *).Name
+            foreach ($DC in $DomainControllers) {
+                $LDAPS = [ADSI]"LDAP://$($DC):636"
+                Try {
+                    $Connection = [adsi]$LDAPS
+                }
+                Catch {
+                }
+                if ($Connection.Path) {
+                    Write-Host "LDAPS properly configured on $DC." -ForegroundColor Green
+                }
+                else {
+                    Write-Host "Cannot establish LDAPS to $DC." -ForegroundColor Red
+                }
+            }
+        }
+        else {
+            $LDAPS = [ADSI]"LDAP://$($DomainController):636"
+            Try {
+                $Connection = [adsi]$LDAPS
+            }
+            Catch {
+            }
+            if ($Connection.Path) {
+                Write-Host "LDAPS properly configured on $DomainController." -ForegroundColor Green
+            }
+            else {
+                Write-Host "Cannot establish LDAPS to $DomainController." -ForegroundColor Red
+            }
+        }
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
