@@ -11,12 +11,19 @@ In the essence, it is just a bundle of functions that will be executed based on 
 Clear-host
 Write-Host -ForegroundColor Green "WELCOME to EveryDay Tool, ease of administration is in front of you!"
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
-Start-Sleep 4
+# Start-Sleep 4
 Write-Host -ForegroundColor Cyan "
+
 ACTIVE DIRECTORY ADMINISTRATION
 -------------------------------
 
 1. Copy AD user right from one AD user to other AD user
+
+DHCP
+-------------------------------
+2. Search All DHCP Servers for a particular MAC Address lease
+3. Search All DHCP Servers for a particular Hostname lease
+
 "
 #############################################
 
@@ -49,6 +56,7 @@ Function Find-Module {
 
 Switch ($Number) 
 {
+################ 1. Copy AD user right from one AD user to other AD user ################################################
     1 {
         Find-Module ActiveDirectory
         $ADUserFirst = (read-host -Prompt "Enter the username from which you want to copy the AD rights")
@@ -56,7 +64,7 @@ Switch ($Number)
         $ADUserSecond = (read-host -Prompt "Enter the username to which you want to copy the AD rights")
         $Stringtest = [string]::IsNullOrEmpty("$ADUserSecond")
         if ($true -eq $Stringtest) {
-            Write-Host "You did not enter any input." -ForegroundColor Red
+            Write-Host "You did not enter any input." -ForegroundColor Yellow
             Break
         }
         try {
@@ -73,6 +81,42 @@ Switch ($Number)
                                                   }
        
         }
+################ 2. Search All DHCP Servers for a particular MAC Address lease ############################################
+     2 {
+
+    $MACAddress = (read-host -Prompt "Enter the MAC address in the following format: XX-XX-XX-XX-XX-XX ")
+    $Stringtest = [string]::IsNullOrEmpty("$MACAddress")
+     if ($true -eq $Stringtest) {
+            Write-Host "You did not enter any input." -ForegroundColor Yellow
+            Break
+        }
+
+    $IDDomain = Get-ADDomainController | Select Partitions
+
+    Get-ADObject -SearchBase $IDDomain.Partitions[3] -Filter 'ObjectClass -eq "dhcpclass"' | Select-Object Name | 
+                             ForEach-Object {
+                                             Get-DhcpServerv4Scope -ComputerName $_.Name | Get-DhcpServerv4Lease -ComputerName $_.Name | Where-Object -property clientid -eq "$MACAddress"
+                                            }
+      }
+
+################ 3. Search All DHCP Servers for a Hostname lease ################################################
+    3 {
+
+    $HostName = (read-host -Prompt "Enter the Hostname (It can be just a part of the name) for which you want to find the leased IP address")
+    $Stringtest = [string]::IsNullOrEmpty("$HostName")
+     if ($true -eq $Stringtest) {
+            Write-Host "You did not enter any input." -ForegroundColor Yellow
+            Break
+        }
+
+    $IDDomain = Get-ADDomainController | Select Partitions
+
+    Get-ADObject -SearchBase $IDDomain.Partitions[3] -Filter 'ObjectClass -eq "dhcpclass"' | Select-Object Name | 
+                             ForEach-Object {
+                                             Get-DhcpServerv4Scope -ComputerName $_.Name | Get-DhcpServerv4Lease -ComputerName $_.Name | Where-Object -property Hostname -like "*$HostName*"
+                                            }
+      }
+
     }
 
     Default {
