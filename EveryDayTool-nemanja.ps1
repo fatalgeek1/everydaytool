@@ -11,8 +11,6 @@ In the essence, it is just a bundle of functions that will be executed based on 
 Clear-host
 Write-Host -ForegroundColor Green "WELCOME to EveryDay Tool, ease of administration is in front of you!"
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
-=======
-#Start-Sleep 4
 Write-Host -ForegroundColor Cyan "
 ACTIVE DIRECTORY ADMINISTRATION
 -------------------------------
