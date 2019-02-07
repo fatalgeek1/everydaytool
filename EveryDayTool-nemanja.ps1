@@ -232,7 +232,7 @@ Switch ($Number) {
         $DomainController = (Get-UserInput -WriteOut "Type the name of the Domain Controller, or type all to test them all:")
         Find-EmptyString -VariableName $DomainController
         if ($DomainController -eq "All") {
-            Write-Host "Search for all Domain Controllers in $env:USERDNSDOMAIN" -ForegroundColor Cyan
+            Write-Host "Searching for all Domain Controllers in $env:USERDNSDOMAIN" -ForegroundColor Cyan
             $DomainControllers = (Get-ADDomainController -Filter *).Name
             foreach ($DC in $DomainControllers) {
                 $LDAPS = [ADSI]"LDAP://$($DC):636"
