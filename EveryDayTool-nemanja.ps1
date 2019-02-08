@@ -84,7 +84,10 @@ Switch ($Number) {
         $DomainControllers = (Get-ADDomainController -filter *).name
         $LastRepTime = (Get-ADReplicationUpToDatenessVectorTable -Target $DomainControllers[0]).LastReplicationSuccess[0]
         Write-Host "Last replication time was at - $LastRepTime" -ForegroundColor Cyan
-        Write-Host "Invoking replication against $DomainControllers" -ForegroundColor Green
+        Write-Host "Invoking replication against:" -ForegroundColor Green
+        foreach ($DC in $DomainControllers) {
+            Write-Host $DC -ForegroundColor Green
+        }
         foreach ($DC in $DomainControllers) {
             Invoke-Command -ComputerName $DC -ScriptBlock {
                 cmd.exe /c repadmin /syncall /A /e /d
@@ -100,7 +103,10 @@ Switch ($Number) {
             $DClist += $DC
         }
         $ZoneList = (Get-DnsServerZone -ComputerName $DClist[0] | Where-Object {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
-        Write-Host "Invoking replication against $DClist for zones $ZoneList" -ForegroundColor Cyan
+        Write-Host "Invoking replication against $DClist for zones:" -ForegroundColor Green
+        foreach ($zone in $ZoneList) {
+            Write-Host $zone -ForegroundColor Green
+        }
         foreach ($DC in $DClist) {
             foreach ($Zone in $ZoneList) {
                 Invoke-Command -ComputerName $DC -ScriptBlock {
@@ -118,7 +124,7 @@ Switch ($Number) {
         if ($DNSServers -eq "All") {
             $DNSServers = New-Object System.Collections.ArrayList
             $FinalDNS = New-Object System.Collections.ArrayList
-            $DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().namingroleowner.DomainControllerName)
+            [string]$DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().namingroleowner.DomainControllerName)
             $Zonelist = (Get-DnsServerZone -ComputerName $DC | Where-Object {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
             foreach ($Zone in $Zonelist) {
                 $DNSTemp = ((Get-DnsServerResourceRecord -ComputerName $DC -ZoneName $Zone -RRType Ns).RecordData.NameServer | Select-Object -Unique)
@@ -131,7 +137,7 @@ Switch ($Number) {
             $FinalDNS = ($FinalDNS | Select-Object -Unique)
             foreach ($Server in $FinalDNS) {
                 Try {
-                    Write-Host "Clearing DNS cache on - $Server." -ForegroundColor Cyan
+                    Write-Host "Clearing DNS cache on - $Server." -ForegroundColor Green
                     Invoke-Command -ComputerName $Server -ScriptBlock {
                         dnscmd /clearcache ; ipconfig /flushdns
                     } -ErrorAction Stop | Out-Null
@@ -160,7 +166,7 @@ Switch ($Number) {
             }
             else {
                 Try {
-                    Write-Host "Clearing DNS cache on - $DNSServers." -ForegroundColor Cyan
+                    Write-Host "Clearing DNS cache on - $DNSServers." -ForegroundColor Green
                     Invoke-Command -ComputerName $DNSServers -ScriptBlock {
                         dnscmd /clearcache ; ipconfig /flushdns
                     } -ErrorAction Stop | Out-Null
