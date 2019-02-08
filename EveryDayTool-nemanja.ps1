@@ -78,7 +78,6 @@ Function Find-EmptyString {
 }
 function Get-UserVariable ($Name = '*')
 {
-  # these variables may exist in certain environments (like ISE, or after use of foreach)
   $special = 'ps','psise','psunsupportedconsoleapplications', 'foreach', 'profile'
   $ps = [PowerShell]::Create()
   $null = $ps.AddScript('$null=$host;Get-Variable') 
