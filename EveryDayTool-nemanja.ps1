@@ -119,7 +119,7 @@ Switch ($Number) {
             $DNSServers = New-Object System.Collections.ArrayList
             $FinalDNS = New-Object System.Collections.ArrayList
             $DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().namingroleowner.DomainControllerName)
-            $Zonelist = (Get-DnsServerZone -ComputerName $DC | ? {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
+            $Zonelist = (Get-DnsServerZone -ComputerName $DC | Where-Object {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
             foreach ($Zone in $Zonelist) {
                 $DNSTemp = ((Get-DnsServerResourceRecord -ComputerName $DC -ZoneName $Zone -RRType Ns).RecordData.NameServer | Select-Object -Unique)
                 $DNSServers += $DNSTemp
@@ -131,7 +131,7 @@ Switch ($Number) {
             $FinalDNS = ($FinalDNS | Select-Object -Unique)
             foreach ($Server in $FinalDNS) {
                 Try {
-                    Write-Host "Clearing DNS cache - $Server." -ForegroundColor Cyan
+                    Write-Host "Clearing DNS cache on - $Server." -ForegroundColor Cyan
                     Invoke-Command -ComputerName $Server -ScriptBlock {
                         dnscmd /clearcache ; ipconfig /flushdns
                     } -ErrorAction Stop | Out-Null
@@ -142,7 +142,33 @@ Switch ($Number) {
             }
         }
         else {
-
+            $DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().namingroleowner.DomainControllerName)
+            $Zonelist = (Get-DnsServerZone -ComputerName $DC | Where-Object {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
+            $CheckEmpty = $null
+            foreach ($Zone in $ZoneList){
+                    $TestDNS = ((Get-DnsServerResourceRecord -ComputerName $DC -ZoneName $Zone -RRType Ns | Where-Object {$_.RecordData.NameServer -eq "$DNSServers.$env:USERDNSDOMAIN."}))
+                    if ($null -eq $TestDNS) {
+                        continue
+                    }
+                    else {
+                        $CheckEmpty += "FoundSomething."
+                    }
+            }
+            if ($null -eq $CheckEmpty) {
+                Write-Host "DNS Server not found as authoritative for any AD integrated zone." -ForegroundColor Red
+                Break
+            }
+            else {
+                Try {
+                    Write-Host "Clearing DNS cache on - $DNSServers." -ForegroundColor Cyan
+                    Invoke-Command -ComputerName $DNSServers -ScriptBlock {
+                        dnscmd /clearcache ; ipconfig /flushdns
+                    } -ErrorAction Stop | Out-Null
+                }
+                Catch {
+                    Write-Host "Cannot reach server - $DNSServers." -ForegroundColor Red
+                }
+            }
         }
     }
     4 {
