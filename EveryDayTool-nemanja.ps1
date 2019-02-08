@@ -58,7 +58,6 @@ Function Get-UserInput {
     process {
         Write-Host "$WriteOut  " -ForegroundColor Magenta -NoNewline
         Read-Host
-
     }
 }
 Function Find-EmptyString {
