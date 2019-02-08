@@ -10,6 +10,7 @@ Write-Host -ForegroundColor Green "WELCOME Powershell4all, ease of administratio
 Write-Host -ForegroundColor Green "You can pick one of the listed options below, backend functions will do the rest for you."
 Write-Host -ForegroundColor Cyan "
 
+
 1. Invoke replication against all of the domain controllers in the forest.
 2. Invoke DNS replication.
 3. Clear DNS cache.
@@ -20,9 +21,9 @@ Write-Host -ForegroundColor Cyan "
 8. Get computer site.
 9. Test secure LDAP.
 10. Get local administrators.
+11. Search all DHCP servers for a particular MAC address lease.
 "
 #############
-
 Try {
     [int]$Number = (Read-Host -Prompt "Chose the task by entering the task number" -ErrorAction Stop)
 }
@@ -75,7 +76,28 @@ Function Find-EmptyString {
         }
     }
 }
-
+function Get-UserVariable ($Name = '*')
+{
+  # these variables may exist in certain environments (like ISE, or after use of foreach)
+  $special = 'ps','psise','psunsupportedconsoleapplications', 'foreach', 'profile'
+  $ps = [PowerShell]::Create()
+  $null = $ps.AddScript('$null=$host;Get-Variable') 
+  $reserved = $ps.Invoke() | 
+    Select-Object -ExpandProperty Name
+  $ps.Runspace.Close()
+  $ps.Dispose()
+  Get-Variable -Scope Global | 
+    Where-Object Name -like $Name |
+    Where-Object { $reserved -notcontains $_.Name } |
+    Where-Object { $special -notcontains $_.Name } |
+    Where-Object Name 
+}
+Function Clear-UserVars {
+    $UserVariables = Get-UserVariable
+    foreach ($Var in $UserVariables) {
+        Remove-Variable $Var.name -Force -Confirm:$false -Scope Global -ErrorAction SilentlyContinue
+    }
+}
 Switch ($Number) {
     1 {
         Find-Module "ActiveDirectory"
@@ -123,7 +145,7 @@ Switch ($Number) {
         if ($DNSServers -eq "All") {
             $DNSServers = New-Object System.Collections.ArrayList
             $FinalDNS = New-Object System.Collections.ArrayList
-            [string]$DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().namingroleowner.DomainControllerName)
+            [string]$DC = ([system.directoryservices.activedirectory.Forest]::GetCurrentForest().schemaroleowner.name)
             $Zonelist = (Get-DnsServerZone -ComputerName $DC | Where-Object {$_.IsDsIntegrated -eq $true -and $_.IsReverseLookupZone -eq $false -and $_.ZoneName -notmatch "TrustAnchors" -and $_.ZoneName -notmatch "_msdcs.$($env:USERDNSDOMAIN)"}).ZoneName
             foreach ($Zone in $Zonelist) {
                 $DNSTemp = ((Get-DnsServerResourceRecord -ComputerName $DC -ZoneName $Zone -RRType Ns).RecordData.NameServer | Select-Object -Unique)
@@ -161,6 +183,7 @@ Switch ($Number) {
             }
             if ($null -eq $CheckEmpty) {
                 Write-Host "DNS Server not found as authoritative for any AD integrated zone." -ForegroundColor Red
+                Clear-UserVars
                 Break
             }
             else {
@@ -185,6 +208,7 @@ Switch ($Number) {
         }
         catch {
             Write-Host "Cannot find an object with identity $($GroupName) under $env:USERDNSDOMAIN" -ForegroundColor Red
+            Clear-UserVars
             Break
         }
         [array]$Members = (Get-ADGroupMember -Identity "$($GroupName)").Name
@@ -225,7 +249,7 @@ Switch ($Number) {
         Write-Output ""
         Write-Host "List of found subnets per site:" -ForegroundColor Cyan
         foreach ($site in $sites) {
-            $temp = New-Object PSCustomObject -Property @{
+            $temp = [PSCustomObject]@{
                 'Site' = $($site.name)
                 'Subnet' = $($site.subnets);
             }
@@ -242,6 +266,7 @@ Switch ($Number) {
         }
         catch {
             Write-Host "Cannot find and object with identity $($SourceUser) under $env:USERDNSDOMAIN" -ForegroundColor Red
+            Clear-UserVars
             Break
         }
         $DestinationUser = (Get-UserInput -WriteOut "Insert the name of the destination user:")
@@ -251,6 +276,7 @@ Switch ($Number) {
         }
         catch {
             Write-Host "Cannot find and object with identity $($SourceUser) under $env:USERDNSDOMAIN" -ForegroundColor Red
+            Clear-UserVars
             Break
         }
         Write-Output ""
@@ -283,9 +309,10 @@ Switch ($Number) {
         }
         Catch {
             Write-Host "Cannot connect to computer - $($RemoteComputer)." -ForegroundColor Red
+            Clear-UserVars
             Break
         }
-        $FoundSite = New-Object PSCustomObject -Property @{
+        $FoundSite = [PSCustomObject]@{
             'ComputerName' = $RemoteComputer;
             'SiteName' = $SiteName;
         }
@@ -338,11 +365,12 @@ Switch ($Number) {
         }
         Catch {
             Write-Host "Cannot connect to computer - $ComputerName or local group does not exist." -ForegroundColor Red
+            Clear-UserVars
             Break
         }
         $AdminList = New-Object System.Collections.ArrayList
         foreach ($Admin in $RetrieveAdmins) {
-            $tempobject = New-Object PSCustomObject -Property @{
+            $tempobject = [PSCustomObject]@{
                 'Name' = $($Admin.Name).Split("\")[1];
                 'Source' = $($Admin.Name).split("\")[0];
                 'Class' = $(if ($Admin.Name -match '\$$') {
@@ -356,6 +384,39 @@ Switch ($Number) {
         }
         Write-Host "Found list of local Administrators is:" -ForegroundColor Green
         $AdminList
+    }
+    11 {
+        Find-Module ActiveDirectory
+        Find-Module DHCPServer
+        $MACAddress = (Get-UserInput -WriteOut "Please enter the MAC address in format aa-bb-cc-dd-ee-ff:")
+        Find-EmptyString -VariableName $MACAddress
+        $Partition = (Get-ADDomainController -Filter * | Select-Object -First 1).partitions
+        $DHCPServers = (Get-ADObject -SearchBase $Partition[3] -Filter {ObjectClass -eq "dhcpclass"} | Where-Object {$_.Name -ne "Dhcproot"}).name
+        foreach ($Server in $DHCPServers) {
+            $AllScopes = (Get-DhcpServerv4Scope -ComputerName $Server)
+            foreach ($Scope in $AllScopes) {
+                $Lease = (Get-DhcpServerv4Lease -ScopeId $($scope.scopeid) -ComputerName $Server | Where-Object {$_.clientid -eq "$MACAddress" -and $_.LeaseExpiryTime -ne $null})
+                if ($null -ne $Lease) {
+                    $leaseobject = [PSCustomObject]@{
+                        'HostName' = $($lease.HostName);
+                        'IPAddress' = $($lease.IPAddress);
+                        'MAC' = $($lease.ClientId)
+                        'DHCP Server' = $server;
+                        'ScopeID' = $($lease.scopeid)
+                    }
+                }
+            }
+        }
+        if ($null -ne $leaseobject) {
+            Write-Host "Found an DHCP lease based on MAC address." -ForegroundColor Green
+            $leaseobject
+            Clear-UserVars
+        }
+        else {
+            Write-Host "Cannot find any DHCP lease based on MAC address." -ForegroundColor Red
+            Clear-UserVars
+            Break
+        }
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
