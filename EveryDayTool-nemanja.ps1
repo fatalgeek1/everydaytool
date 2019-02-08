@@ -22,6 +22,7 @@ Write-Host -ForegroundColor Cyan "
 9. Test secure LDAP.
 10. Get local administrators.
 11. Search all DHCP servers for a particular MAC address lease.
+12. Search all DHCP servers for a particular HostName lease.
 "
 #############
 Try {
@@ -31,7 +32,8 @@ Catch {
     Write-Host "Input accepts only integers, please relaunch the script." -ForegroundColor Red
     Break
 }
-Function Find-Module {
+####### FUNCTIONS #######
+Function Import-CustomModule {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$True,Position=0)]
@@ -76,7 +78,7 @@ Function Find-EmptyString {
         }
     }
 }
-function Get-UserVariable ($Name = '*')
+Function Get-UserVariable ($Name = '*')
 {
   $special = 'ps','psise','psunsupportedconsoleapplications', 'foreach', 'profile'
   $ps = [PowerShell]::Create()
@@ -97,9 +99,36 @@ Function Clear-UserVars {
         Remove-Variable $Var.name -Force -Confirm:$false -Scope Global -ErrorAction SilentlyContinue
     }
 }
+Function Find-ADPartition {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true,Position=0)]
+        [ValidateSet("Configuration","Schema","DNS","Root")]
+        [ValidateNotNullOrEmpty()]
+        [string]$PartitionName
+    )
+    Process {
+        Find-Module -ModuleName ActiveDirectory
+        $Partitionlist = (Get-ADDomainController -Filter * | Select-Object -First 1).partitions
+        if ($PartitionName -eq "Configuration") {
+            $Partitionlist | Where-Object {$_ -like "CN=Configuration,DC=$($env:USERDNSDOMAIN.split(".")[0]),DC=$($env:USERDNSDOMAIN.split(".")[1])"}
+        }
+        elseif ($PartitionName -eq "Schema") {
+            $Partitionlist | Where-Object {$_ -like "CN=Schema,CN=Configuration,DC=$($env:USERDNSDOMAIN.split(".")[0]),DC=$($env:USERDNSDOMAIN.split(".")[1])"}
+        }
+        elseif ($PartitionName -eq "DNS") {
+            $Partitionlist | Where-Object {$_ -like "DC=DomainDNSZones,DC=$($env:USERDNSDOMAIN.split(".")[0]),DC=$($env:USERDNSDOMAIN.split(".")[1])"}
+        }
+        elseif ($PartitionName -eq "Root") {
+            $Partitionlist | Where-Object {$_ -eq "DC=$($env:USERDNSDOMAIN.split(".")[0]),DC=$($env:USERDNSDOMAIN.split(".")[1])"}
+        }
+    }
+}
+
+######################################################################################################
 Switch ($Number) {
     1 {
-        Find-Module "ActiveDirectory"
+        Import-CustomModule "ActiveDirectory"
         # Check last replication time first
         $DomainControllers = (Get-ADDomainController -filter *).name
         $LastRepTime = (Get-ADReplicationUpToDatenessVectorTable -Target $DomainControllers[0]).LastReplicationSuccess[0]
@@ -115,7 +144,7 @@ Switch ($Number) {
         }
     }
     2 {
-        Find-Module ActiveDirectory
+        Import-CustomModule ActiveDirectory
         $DClist = new-object System.Collections.Arraylist
         $SiteList = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().sites.name
         foreach ($Site in $SiteList) {
@@ -137,8 +166,8 @@ Switch ($Number) {
         }
     }
     3 {
-        Find-Module ActiveDirectory
-        Find-Module DNSServer
+        Import-CustomModule ActiveDirectory
+        Import-CustomModule DNSServer
         $DNSServers = (Get-UserInput -WriteOut "Type the name of DNS server, or type all to affect them all:")
         Find-EmptyString -VariableName $DNSServers
         if ($DNSServers -eq "All") {
@@ -199,7 +228,7 @@ Switch ($Number) {
         }
     }
     4 {
-        Find-Module ActiveDirectory
+        Import-CustomModule ActiveDirectory
         $GroupName = (Get-UserInput -WriteOut "Enter the group name:")
         Find-EmptyString -VariableName $GroupName
         try {
@@ -218,7 +247,7 @@ Switch ($Number) {
         }
     }
     5 {
-        Find-Module ActiveDirectory
+        Import-CustomModule ActiveDirectory
         Write-Host "Script is going to check for all of the computer objects that did not update their password for +90 days." -ForegroundColor Cyan
         $PwdAge = 90
         $PwdDate = (get-date).AddDays(-$PwdAge).ToFileTime()
@@ -236,7 +265,7 @@ Switch ($Number) {
 
     }
     6 {
-        Find-Module ActiveDirectory
+        Import-CustomModule ActiveDirectory
         $sites = [System.DirectoryServices.ActiveDirectory.Forest]::GetCurrentForest().sites
         $sitesandsubnets = New-Object System.Collections.ArrayList
         Write-Host "List of found AD sites is:" -ForegroundColor Cyan
@@ -257,7 +286,7 @@ Switch ($Number) {
         $sitesandsubnets
     }
     7 {
-        Find-Module ActiveDirectory
+        Import-CustomModule ActiveDirectory
         $SourceUser = (Get-UserInput -WriteOut "Insert the name of the source user:")
         Find-EmptyString -VariableName $SourceUser
         try {
@@ -385,8 +414,8 @@ Switch ($Number) {
         $AdminList
     }
     11 {
-        Find-Module ActiveDirectory
-        Find-Module DHCPServer
+        Import-CustomModule ActiveDirectory
+        Import-CustomModule DHCPServer
         $MACAddress = (Get-UserInput -WriteOut "Please enter the MAC address in format aa-bb-cc-dd-ee-ff:")
         Find-EmptyString -VariableName $MACAddress
         $Partition = (Get-ADDomainController -Filter * | Select-Object -First 1).partitions
@@ -416,6 +445,11 @@ Switch ($Number) {
             Clear-UserVars
             Break
         }
+    }
+    12 {
+        $HostName = (Get-UserInput -WriteOut "Please enter the host name:")
+        Find-EmptyString -VariableName $HostName
+
     }
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
