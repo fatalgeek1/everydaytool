@@ -24,6 +24,9 @@ DHCP
 2. Search All DHCP Servers for a particular MAC Address lease
 3. Search All DHCP Servers for a particular Hostname lease
 
+MAIL
+-------------------------------
+4. Search for newly created e-mails in the last 5, 10, 30 or more days...
 "
 #############################################
 
@@ -35,6 +38,9 @@ Catch {
     Write-Host "Input accepts only integers, please relaunch the script." -ForegroundColor Red
     Break
 }
+
+############################# Functions #######################################################
+
 Function Find-Module {
     [CmdletBinding()]
     param (
@@ -54,9 +60,26 @@ Function Find-Module {
     }
 }
 
+Function Get-UserInput {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true,Position=0)]
+        [ValidateNotNullOrEmpty()]
+        [string]$WriteOut
+    )
+    process {
+        Write-Host "$WriteOut  " -ForegroundColor Green -NoNewline
+        Read-Host
+    }
+}
+
+######################### Switch Part ########################################################################
+
 Switch ($Number) 
 {
+
 ################ 1. Copy AD user right from one AD user to other AD user ################################################
+
     1 {
         Find-Module ActiveDirectory
         $ADUserFirst = (read-host -Prompt "Enter the username from which you want to copy the AD rights")
@@ -81,7 +104,9 @@ Switch ($Number)
                                                   }
        
         }
+
 ################ 2. Search All DHCP Servers for a particular MAC Address lease ############################################
+     
      2 {
 
     $MACAddress = (read-host -Prompt "Enter the MAC address in the following format: XX-XX-XX-XX-XX-XX ")
@@ -100,6 +125,7 @@ Switch ($Number)
       }
 
 ################ 3. Search All DHCP Servers for a Hostname lease ################################################
+   
     3 {
 
     $HostName = (read-host -Prompt "Enter the Hostname (It can be just a part of the name) for which you want to find the leased IP address")
@@ -117,8 +143,21 @@ Switch ($Number)
                                             }
       }
 
-    }
+################# 4. Search for newly created e-mails in the last 5, 10, 30 or more days... #####################################
+    
+    4 {
+
+$AddDays = (Get-UserInput -WriteOut "How many days in the past do you want to search? Enter the number of days")
+$When = ((Get-Date).AddDays(-$AddDays)).Date
+$UserSearch = Get-ADUser -Filter {whenCreated -ge $When -and enabled -eq $true} -Properties * | Where-Object {$_.proxyaddresses -like "SMTP:*"} | select -expand proxyaddresses
+$UserSearch | Select-String -Pattern "SMTP" -CaseSensitive
+     }
+
+
+################################# Default ###################################################
 
     Default {
         Write-Host "Number that you entered is out of scope or input is empty." -ForegroundColor Red
             }
+
+}
