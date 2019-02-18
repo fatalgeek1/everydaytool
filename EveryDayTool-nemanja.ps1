@@ -1,6 +1,7 @@
 <#
 
 just a comment
+aaaa
 
 .DESCRIPTION
 Powershell4All automation tool represents an open source collaboration project with the goal to speed up the day-to-day administration tasks in Microsoft environments.
