@@ -17,16 +17,19 @@ Write-Host -ForegroundColor Cyan "
 ACTIVE DIRECTORY ADMINISTRATION
 -------------------------------
 
-1. Copy AD user right from one AD user to other AD user
+11 Copy AD user right from one AD user to other AD user
+12 Clone AD Members of one group to the new group
+13 GPO Search
 
 DHCP
 -------------------------------
-2. Search All DHCP Servers for a particular MAC Address lease
-3. Search All DHCP Servers for a particular Hostname lease
+21 Search All DHCP Servers for a particular MAC Address lease
+22 Search All DHCP Servers for a particular Hostname lease
 
 MAIL
 -------------------------------
-4. Search for newly created e-mails in the last 5, 10, 30 or more days...
+31 Search for newly created e-mails in the last 5, 10, 30 or more days...
+
 "
 #############################################
 
@@ -78,9 +81,9 @@ Function Get-UserInput {
 Switch ($Number) 
 {
 
-################ 1. Copy AD user right from one AD user to other AD user ################################################
+################ 11 Copy AD user right from one AD user to other AD user ################################################
 
-    1 {
+   11 {
         Find-Module ActiveDirectory
         $ADUserFirst = (read-host -Prompt "Enter the username from which you want to copy the AD rights")
         $Stringtest = [string]::IsNullOrEmpty("$ADUserFirst")
@@ -105,9 +108,53 @@ Switch ($Number)
        
         }
 
-################ 2. Search All DHCP Servers for a particular MAC Address lease ############################################
+########################## 12 Clone AD Members of one group to the new group ##########################################
+
+   12  {
+
+        Find-Module ActiveDirectory
+
+        $SourceGroup = (read-host -Prompt "Enter the name of the source group: ")
+        $DestionationGroup = (read-host -Prompt "Enter the name of the destionation group: ")
+
+        Add-ADGroupMember -Identity $DestionationGroup -Members (Get-ADGroupMember -Identity $SourceGroup -Recursive) -Verbose
+
+       }
+
+######################## 13 GPO Search ###################################################################################
+
+   13 {
+
+        Find-Module ActiveDirectory
+        
+        # Get the string we want to search for
+        $StringSearch = Read-Host -Prompt "Enter text which you want to search in all GPO's "
+
+        # Set the domain to search for GPOs
+        $DomainName = $env:USERDNSDOMAIN
+
+        # Find all GPOs in the current domain
+        write-host -ForegroundColor DarkCyan "Finding all the GPOs in $DomainName"
+        Import-Module grouppolicy
+        $allGposInDomain = Get-GPO -All -Domain $DomainName
+
+        # Look through each GPO's XML for the string
+        Write-Host -ForegroundColor Green "Starting search...."
+        foreach ($gpo in $allGposInDomain) {
+        $report = Get-GPOReport -Guid $gpo.Id -ReportType Xml
+                if ($report -match $StringSearch) {
+                    write-host -ForegroundColor green "********** Match found in: $($gpo.DisplayName) **********"
+                                                  } # end if
+            else {
+        Write-Host -foregroundcolor Red "No match in: $($gpo.DisplayName)"
+                 } # end else
+                                           } # end foreach
+        
+}
+
+################ 21 Search All DHCP Servers for a particular MAC Address lease ############################################
      
-     2 {
+    21 {
 
     $MACAddress = (read-host -Prompt "Enter the MAC address in the following format: XX-XX-XX-XX-XX-XX ")
     $Stringtest = [string]::IsNullOrEmpty("$MACAddress")
@@ -124,9 +171,9 @@ Switch ($Number)
                                             }
       }
 
-################ 3. Search All DHCP Servers for a Hostname lease ################################################
+################ 22 Search All DHCP Servers for a Hostname lease ################################################
    
-    3 {
+   22 {
 
     $HostName = (read-host -Prompt "Enter the Hostname (It can be just a part of the name) for which you want to find the leased IP address")
     $Stringtest = [string]::IsNullOrEmpty("$HostName")
@@ -143,9 +190,9 @@ Switch ($Number)
                                             }
       }
 
-################# 4. Search for newly created e-mails in the last 5, 10, 30 or more days... #####################################
+################# 31 Search for newly created e-mails in the last 5, 10, 30 or more days... #####################################
     
-    4 {
+   31 {
 
 $AddDays = (Get-UserInput -WriteOut "How many days in the past do you want to search? Enter the number of days")
 $When = ((Get-Date).AddDays(-$AddDays)).Date
